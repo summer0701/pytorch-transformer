@@ -105,14 +105,14 @@ class ResidualConnection(nn.Module):
             return x + self.dropout(sublayer(self.norm(x)))
 
 class MultiHeadAttentionBlock(nn.Module):
-
+    # C:\Users\summe\Workspaces\pytorch-transformer\img\mha.jpg
     def __init__(self, d_model: int, h: int, dropout: float) -> None:
         super().__init__()
         self.d_model = d_model # Embedding vector size
         self.h = h # Number of heads
         # Make sure d_model is divisible by h
         assert d_model % h == 0, "d_model is not divisible by h"
-
+        #  // 정수 나눗셈 
         self.d_k = d_model // h # Dimension of vector seen by each head
         self.w_q = nn.Linear(d_model, d_model, bias=False) # Wq
         self.w_k = nn.Linear(d_model, d_model, bias=False) # Wk
@@ -122,9 +122,13 @@ class MultiHeadAttentionBlock(nn.Module):
 
     @staticmethod
     def attention(query, key, value, mask, dropout: nn.Dropout):
+        # mask 단어가 다른 단어와 상호작용하지 않도록 하는 것
+        # d_k는 q,k,v의 마지막 차원
         d_k = query.shape[-1]
         # Just apply the formula from the paper
         # (batch, h, seq_len, d_k) --> (batch, h, seq_len, seq_len)
+        # @ pytorch에 matrix multiplication을 수행한다.
+        # 마지막 2 dim을 뒤집음
         attention_scores = (query @ key.transpose(-2, -1)) / math.sqrt(d_k)
         if mask is not None:
             # Write a very low value (indicating -inf) to the positions where mask == 0
@@ -137,11 +141,15 @@ class MultiHeadAttentionBlock(nn.Module):
         return (attention_scores @ value), attention_scores
 
     def forward(self, q, k, v, mask):
+        # 인풋과 아웃풋이 같게 나온다. 
         query = self.w_q(q) # (batch, seq_len, d_model) --> (batch, seq_len, d_model)
         key = self.w_k(k) # (batch, seq_len, d_model) --> (batch, seq_len, d_model)
         value = self.w_v(v) # (batch, seq_len, d_model) --> (batch, seq_len, d_model)
 
         # (batch, seq_len, d_model) --> (batch, seq_len, h, d_k) --> (batch, h, seq_len, d_k)
+        # batch,sequence dim 은 유지한다. d model을 h와 d_k로 나눈다.
+        # transpose를 하는 이유는 마지막 차원을 seq x dk로 바꿔 Wo와 곱하기 위해서
+        # 이런식으로 각각의 head는 full sentence를 보면서 작은 embedding part를 보기 때문이다.
         query = query.view(query.shape[0], query.shape[1], self.h, self.d_k).transpose(1, 2)
         key = key.view(key.shape[0], key.shape[1], self.h, self.d_k).transpose(1, 2)
         value = value.view(value.shape[0], value.shape[1], self.h, self.d_k).transpose(1, 2)
@@ -151,6 +159,7 @@ class MultiHeadAttentionBlock(nn.Module):
         
         # Combine all the heads together
         # (batch, h, seq_len, d_k) --> (batch, seq_len, h, d_k) --> (batch, seq_len, d_model)
+        # contiguous: pytorch에서 contiguous 하게 바꾸기 위해 
         x = x.transpose(1, 2).contiguous().view(x.shape[0], -1, self.h * self.d_k)
 
         # Multiply by Wo
