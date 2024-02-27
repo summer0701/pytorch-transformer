@@ -3,7 +3,7 @@ import torch.nn as nn
 import math
 
 class LayerNormalization(nn.Module):
-
+    # C:\Users\summe\Workspaces\pytorch-transformer\img\ln.jpg
     def __init__(self, features: int, eps:float=10**-6) -> None:
         super().__init__()
         self.eps = eps
@@ -12,7 +12,11 @@ class LayerNormalization(nn.Module):
 
     def forward(self, x):
         # x: (batch, seq_len, hidden_size)
-         # Keep the dimension for broadcasting
+        # Keep the dimension for broadcasting
+        # 배치의 마지막 dim 을 mean함
+        
+        # 일반적으로 mean은 dim을 없애지만 keepdim=True로 하면 dim을 유지함
+        # dim=-1 은 마지막 차원을 의미함
         mean = x.mean(dim = -1, keepdim = True) # (batch, seq_len, 1)
         # Keep the dimension for broadcasting
         std = x.std(dim = -1, keepdim = True) # (batch, seq_len, 1)
@@ -29,10 +33,12 @@ class FeedForwardBlock(nn.Module):
 
     def forward(self, x):
         # (batch, seq_len, d_model) --> (batch, seq_len, d_ff) --> (batch, seq_len, d_model)
+        # d_model은 word 벡터의 차원의 수이다. 벡터는 각 단어의 의미를 나타낸다.
         return self.linear_2(self.dropout(torch.relu(self.linear_1(x))))
 
 class InputEmbeddings(nn.Module):
-
+    # vocab_size: vocab에 몇개의 word가 있는가?
+    # d_model: 임베딩의 차원의수
     def __init__(self, d_model: int, vocab_size: int) -> None:
         super().__init__()
         self.d_model = d_model
@@ -42,31 +48,49 @@ class InputEmbeddings(nn.Module):
     def forward(self, x):
         # (batch, seq_len) --> (batch, seq_len, d_model)
         # Multiply by sqrt(d_model) to scale the embeddings according to the paper
+        # 임베딩 레이어는 단순히 같은 vector로 구성되어있는 딕셔너리다. => 모델에 의해서 vector는 학습됨
+        
         return self.embedding(x) * math.sqrt(self.d_model)
     
 class PositionalEncoding(nn.Module):
-
+    # d_model: PositionalEncoding 이 가져야 할 사이즈이다.
+    # seq_len: 문장의 길이
+    # dropout: 모델을 덜 overfeat하기 위해서 필요함
+    # 안정적인 수치 연산을 위해서 pe를 함
     def __init__(self, d_model: int, seq_len: int, dropout: float) -> None:
         super().__init__()
         self.d_model = d_model
         self.seq_len = seq_len
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = nn.Dropout(dropout) 
         # Create a matrix of shape (seq_len, d_model)
         pe = torch.zeros(seq_len, d_model)
+
+        # 문장 벡터 생성
         # Create a vector of shape (seq_len)
+        # [seq_len]의 형태를 가지고 있다면, unsqueeze(1)을 호출한 후의 텐서는 [seq_len, 1]의 형태를 가지게 됨
+        # C:\Users\summe\Workspaces\pytorch-transformer\img\pe.png
         position = torch.arange(0, seq_len, dtype=torch.float).unsqueeze(1) # (seq_len, 1)
+
         # Create a vector of shape (d_model)
+        # 수치적 안정을 위해서 log로 계산 (-math.log(10000.0) / d_model
+        # torch.arange 는 0에서 d_model까지 2씩 증가함. 그래서 d_model/2가 됨
         div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model)) # (d_model / 2)
         # Apply sine to even indices
+        # 0::2 0부터 시작해서 2의 배수는 적용한다. 
+        # position * div_term 곱하면 브로드캐스팅이 되서 350X256이 됨
         pe[:, 0::2] = torch.sin(position * div_term) # sin(position * (10000 ** (2i / d_model))
         # Apply cosine to odd indices
         pe[:, 1::2] = torch.cos(position * div_term) # cos(position * (10000 ** (2i / d_model))
         # Add a batch dimension to the positional encoding
+        # 배치 작업을 위해서 첫번째 차원을 추가한다.
         pe = pe.unsqueeze(0) # (1, seq_len, d_model)
         # Register the positional encoding as a buffer
+        # 모듈에 저장하고 파라미터를 학습하고 싶을때
         self.register_buffer('pe', pe)
 
     def forward(self, x):
+        # requires_grad_ 이텐서는 학습 하지 않음
+        # torch.Size([8, 350, 512]): 8 batch, 350 문장길이, 512 모델 크기
         x = x + (self.pe[:, :x.shape[1], :]).requires_grad_(False) # (batch, seq_len, d_model)
         return self.dropout(x)
 
