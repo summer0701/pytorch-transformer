@@ -102,6 +102,7 @@ class ResidualConnection(nn.Module):
             self.norm = LayerNormalization(features)
     
         def forward(self, x, sublayer):
+            # x 와 sublayer(x)를 더한다.
             return x + self.dropout(sublayer(self.norm(x)))
 
 class MultiHeadAttentionBlock(nn.Module):
@@ -167,7 +168,7 @@ class MultiHeadAttentionBlock(nn.Module):
         return self.w_o(x)
 
 class EncoderBlock(nn.Module):
-
+    # C:\Users\summe\Workspaces\pytorch-transformer\img\residualConnection.png
     def __init__(self, features: int, self_attention_block: MultiHeadAttentionBlock, feed_forward_block: FeedForwardBlock, dropout: float) -> None:
         super().__init__()
         self.self_attention_block = self_attention_block
@@ -175,12 +176,14 @@ class EncoderBlock(nn.Module):
         self.residual_connections = nn.ModuleList([ResidualConnection(features, dropout) for _ in range(2)])
 
     def forward(self, x, src_mask):
+        # src_mask : hide padding word in the sentence
+        # self attention 인 이유는 같은 문장의 단어들끼리 상호작용하기 때문이다. 
         x = self.residual_connections[0](x, lambda x: self.self_attention_block(x, x, x, src_mask))
         x = self.residual_connections[1](x, self.feed_forward_block)
         return x
     
 class Encoder(nn.Module):
-
+    # C:\Users\summe\Workspaces\pytorch-transformer\img\residualConnection.png
     def __init__(self, features: int, layers: nn.ModuleList) -> None:
         super().__init__()
         self.layers = layers
