@@ -195,7 +195,7 @@ class Encoder(nn.Module):
         return self.norm(x)
 
 class DecoderBlock(nn.Module):
-
+    # C:\Users\summe\Workspaces\pytorch-transformer\img\decoder.jpg
     def __init__(self, features: int, self_attention_block: MultiHeadAttentionBlock, cross_attention_block: MultiHeadAttentionBlock, feed_forward_block: FeedForwardBlock, dropout: float) -> None:
         super().__init__()
         self.self_attention_block = self_attention_block
@@ -204,6 +204,9 @@ class DecoderBlock(nn.Module):
         self.residual_connections = nn.ModuleList([ResidualConnection(features, dropout) for _ in range(3)])
 
     def forward(self, x, encoder_output, src_mask, tgt_mask):
+        # x : decoder input
+        # src_mask : hide padding word in the sentence 소스 언어에서 나오는 mask(english)
+        # tgt_mask : hide future word in the sentence 타겟 언어에서 나오는 mask(itlian)
         x = self.residual_connections[0](x, lambda x: self.self_attention_block(x, x, x, tgt_mask))
         x = self.residual_connections[1](x, lambda x: self.cross_attention_block(x, encoder_output, encoder_output, src_mask))
         x = self.residual_connections[2](x, self.feed_forward_block)
@@ -222,7 +225,7 @@ class Decoder(nn.Module):
         return self.norm(x)
 
 class ProjectionLayer(nn.Module):
-
+    # convert embedding to vocab
     def __init__(self, d_model, vocab_size) -> None:
         super().__init__()
         self.proj = nn.Linear(d_model, vocab_size)
@@ -257,10 +260,15 @@ class Transformer(nn.Module):
     
     def project(self, x):
         # (batch, seq_len, vocab_size)
+        # take the embedding to the vocab size
         return self.projection_layer(x)
     
 def build_transformer(src_vocab_size: int, tgt_vocab_size: int, src_seq_len: int, tgt_seq_len: int, d_model: int=512, N: int=6, h: int=8, dropout: float=0.1, d_ff: int=2048) -> Transformer:
+    # N: number of encoder and decoder blocks
+    # h: number of heads
+    # dff : feed forward layer의 차원
     # Create the embedding layers
+    # InputEmbeddings 은 vocab size 에서 embedding vector로 변환한다.(512차원으로 변환한다.)
     src_embed = InputEmbeddings(d_model, src_vocab_size)
     tgt_embed = InputEmbeddings(d_model, tgt_vocab_size)
 
@@ -290,12 +298,16 @@ def build_transformer(src_vocab_size: int, tgt_vocab_size: int, src_seq_len: int
     decoder = Decoder(d_model, nn.ModuleList(decoder_blocks))
     
     # Create the projection layer
+    # we want to convert  the embedding to the target vocab size
     projection_layer = ProjectionLayer(d_model, tgt_vocab_size)
     
     # Create the transformer
     transformer = Transformer(encoder, decoder, src_embed, tgt_embed, src_pos, tgt_pos, projection_layer)
     
     # Initialize the parameters
+    # training 을 빨리하기 위해서 xavier uniform을 사용한다.
+    # xavier uniform 는 입력과 출력의 분포가 비슷하다고 가정할때 작 동작한다. 하지만 RELU에는 잘 동작하지 않는다.
+    
     for p in transformer.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
