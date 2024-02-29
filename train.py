@@ -16,6 +16,7 @@ from pathlib import Path
 # Huggingface datasets and tokenizers
 from datasets import load_dataset
 from tokenizers import Tokenizer
+# wordLevel 은 단어 단위로 토큰화
 from tokenizers.models import WordLevel
 from tokenizers.trainers import WordLevelTrainer
 from tokenizers.pre_tokenizers import Whitespace
@@ -122,6 +123,7 @@ def run_validation(model, validation_ds, tokenizer_src, tokenizer_tgt, max_len, 
         writer.flush()
 
 def get_all_sentences(ds, lang):
+    # 원하는 한 언어만 추출 (yield를 만날때마다 중간결과를 리턴하고 일시중지, 이후 다시 호출되면 중간결과 이후부터 다시 시작)
     for item in ds:
         yield item['translation'][lang]
 
@@ -130,7 +132,9 @@ def get_or_build_tokenizer(config, ds, lang):
     if not Path.exists(tokenizer_path):
         # Most code taken from: https://huggingface.co/docs/tokenizers/quicktour
         tokenizer = Tokenizer(WordLevel(unk_token="[UNK]"))
+        # split by whitespace
         tokenizer.pre_tokenizer = Whitespace()
+        # min_frequency = 2, 어휘에 최소 몇번 등장해야 vocab에 포함시킬지
         trainer = WordLevelTrainer(special_tokens=["[UNK]", "[PAD]", "[SOS]", "[EOS]"], min_frequency=2)
         tokenizer.train_from_iterator(get_all_sentences(ds, lang), trainer=trainer)
         tokenizer.save(str(tokenizer_path))
@@ -164,7 +168,7 @@ def get_ds(config):
         max_len_src = max(max_len_src, len(src_ids))
         max_len_tgt = max(max_len_tgt, len(tgt_ids))
 
-    print(f'Max length of source sentence: {max_len_src}')
+    print(f'Max lenaaaaaagth of source sentence: {max_len_src}')
     print(f'Max length of target sentence: {max_len_tgt}')
     
 
