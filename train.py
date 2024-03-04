@@ -220,7 +220,9 @@ def train_model(config):
         global_step = state['global_step']
     else:
         print('No model to preload, starting from scratch')
-
+    # ignore_index: we don't use the loss from the padding token
+    # label_smoothing: to prevent the model from being too confident about its predictions(less overfitting)
+    # 높은 probility 값에 대해 0.1 정도의 확률을 빼서 다른 값에 더해줌
     loss_fn = nn.CrossEntropyLoss(ignore_index=tokenizer_src.token_to_id('[PAD]'), label_smoothing=0.1).to(device)
 
     for epoch in range(initial_epoch, config['num_epochs']):
@@ -231,18 +233,24 @@ def train_model(config):
 
             encoder_input = batch['encoder_input'].to(device) # (b, seq_len)
             decoder_input = batch['decoder_input'].to(device) # (B, seq_len)
+            # encoder_mask와 decoder_mask가 다른 이유는 encoder_mask는 padding만 처리하면 되지만,
+            # decoder_mask는 padding과 causal을 처리해야 하기 때문(즉 후속 단어를 mask해야함)
             encoder_mask = batch['encoder_mask'].to(device) # (B, 1, 1, seq_len)
             decoder_mask = batch['decoder_mask'].to(device) # (B, 1, seq_len, seq_len)
 
             # Run the tensors through the encoder, decoder and the projection layer
             encoder_output = model.encode(encoder_input, encoder_mask) # (B, seq_len, d_model)
             decoder_output = model.decode(encoder_output, encoder_mask, decoder_input, decoder_mask) # (B, seq_len, d_model)
+
+            # map it to vocab size
             proj_output = model.project(decoder_output) # (B, seq_len, vocab_size)
 
             # Compare the output with the label
             label = batch['label'].to(device) # (B, seq_len)
 
             # Compute the loss using a simple cross entropy
+
+            # (b, seq_len,tgt_vocab_size) -> (b*seq_len, tgt_vocab_size)
             loss = loss_fn(proj_output.view(-1, tokenizer_tgt.get_vocab_size()), label.view(-1))
             batch_iterator.set_postfix({"loss": f"{loss.item():6.3f}"})
 

@@ -13,7 +13,7 @@ class BilingualDataset(Dataset):
         self.tokenizer_tgt = tokenizer_tgt
         self.src_lang = src_lang
         self.tgt_lang = tgt_lang
-
+        # vocab 가 32보다 크기 때문에 int64를 씀
         self.sos_token = torch.tensor([tokenizer_tgt.token_to_id("[SOS]")], dtype=torch.int64)
         self.eos_token = torch.tensor([tokenizer_tgt.token_to_id("[EOS]")], dtype=torch.int64)
         self.pad_token = torch.tensor([tokenizer_tgt.token_to_id("[PAD]")], dtype=torch.int64)
@@ -86,5 +86,6 @@ class BilingualDataset(Dataset):
         }
     
 def causal_mask(size):
+    # triu : above the diagonal is 0, below the diagonal is 1
     mask = torch.triu(torch.ones((1, size, size)), diagonal=1).type(torch.int)
     return mask == 0
